@@ -1,4 +1,5 @@
-import { Engine, RHYTHMS, CHORDS, fieldRates, shapePower, droneAmps, droneDepth, pulsePattern, makeCueData, SR_STORE, warmthHz } from './engine.js';
+import { Engine, RHYTHMS, CHORDS, makeCueData, SR_STORE, warmthHz } from './engine.js';
+import { Bubble } from './bubble.js';
 import * as store from './store.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -18,6 +19,7 @@ const DEFAULTS = {
   beats: { on: true, level: 0.45, mode: 'binaural', carrier: 196, beat: 4, glide: true, glideTo: 2 },
   noise: { on: true, level: 0.45, color: 'brown', tone: 700, waves: 0.5 },
   sleep: { timer: 45, fade: 10, winddown: true, warmth: 0.75, lucid: false, lucidStart: 4.5, lucidEvery: 20, lucidCount: 4, lucidCue: 'chime', lucidLevel: 0.45, darkOrbit: false },
+  visual: { on: true, level: 0.7, color: 'auto', hue: 'key', skin: true, balls: true, star: true, knot: true, echoes: true, haze: true },
 };
 
 const BUILTIN = [
@@ -134,7 +136,7 @@ function change(path, v) {
   setP(path, v);
   saveSoon();
   afterChange(path);
-  if (!engine.playing) return;
+  if (!engine.playing || path.startsWith('visual.')) return;
   if (IMMEDIATE.has(path)) engine.set(state, path);
   else {
     clearTimeout(pending[path]);
@@ -148,7 +150,7 @@ function afterChange(path) {
   refreshControls();
   updateClock();
   if (!engine.playing) drawStatic();
-  if (path === 'sleep.darkOrbit' && !darkEl.hidden) drawDarkOnce();
+  if ((path === 'sleep.darkOrbit' || path.startsWith('visual.')) && !darkEl.hidden) drawDarkOnce();
 }
 
 // ---------------------------------------------------------------- formatting
@@ -292,7 +294,7 @@ function switchCtl(def, extraCls) {
 
 // ---------------------------------------------------------------- panels
 
-const PANEL_LAYER = { voice: 'voice', drone: 'drone', pulse: 'pulse', beats: 'beats', noise: 'noise' };
+const PANEL_LAYER = { voice: 'voice', drone: 'drone', pulse: 'pulse', beats: 'beats', noise: 'noise', visual: 'visual' };
 
 const PANELS = {
   voice: () => [
@@ -353,6 +355,54 @@ const PANELS = {
     { k: 'slider', path: 'noise.waves', label: 'Waves', min: 0, max: 1, step: 0.01, fmt: pct },
     { k: 'note', text: 'Waves swell once per cycle, in step with the drone. Brown noise is deeper, like surf; pink is closer to rain.' },
   ],
+  visual: () => [
+    { k: 'layer', layer: 'visual', title: 'Visual', levelLabel: 'Brightness' },
+    { k: 'seg', path: 'visual.color', label: 'Color', options: [['night', 'Night'], ['wheel', 'Full wheel'], ['auto', 'Auto']] },
+    {
+      k: 'note',
+      text: 'Night shows the bubble as if under a sodium street lamp: one amber wavelength, so the film shows amber bands and no blue or green. Full wheel shows its real rainbow colors. Auto uses Night whenever the sleep timer is on.',
+    },
+    { k: 'group', label: 'What you see' },
+    { k: 'switch', path: 'visual.skin', label: 'Bubble skin' },
+    {
+      k: 'note',
+      text: 'A soap film made of points. The root makes the whole bubble breathe, and each higher partial sets off one of its natural vibration patterns, the sphere’s version of a string’s overtones. The colors come from light interfering inside the film, which drains thinner toward the top.',
+    },
+    { k: 'switch', path: 'visual.balls', label: 'Bouncing tones' },
+    {
+      k: 'note',
+      text: 'One ball for each ring of the rhythm, bouncing inside the bubble. A tone sounds the moment its ball hits the skin. A ball bouncing in a sphere stays in one flat plane, so each traces a shape, and all of them meet at the top on the first beat of every cycle. Each ball leaves an afterimage of its last lap, so its whole shape stays lit and is redrawn as the ball comes round.',
+    },
+    { k: 'note', text: 'Every hit sends a ripple across the skin. It spreads, crosses the middle, and gathers again at the opposite point about two seconds later. Strikes the variation drops make no ripple; the ball just bounces on silently.' },
+    { k: 'switch', path: 'visual.star', label: 'Star paths', when: (s) => s.visual.balls },
+    { k: 'note', text: 'On: five, seven and eight hits trace stars instead of polygons. The sound is the same either way; only the order of the points changes.' },
+    { k: 'switch', path: 'visual.knot', label: 'Harmonic knot' },
+    {
+      k: 'note',
+      text: 'The drone drawn as a 3D harmonograph that fills the bubble: the partials take turns driving the three directions, so the line closes into a knot. It swells with the drone until it presses against the skin, which glows where it touches. Every strike plucks it, and your voice lights it where a shell passes through. Simple chords make open knots; minor and pentatonic weave dense ones.',
+    },
+    { k: 'switch', path: 'visual.echoes', label: 'Voice echoes' },
+    {
+      k: 'note',
+      text: 'While a copy of your voice speaks, a faint shell grows out from the center. Each copy loops a little longer than the one before, so the shells drift apart into echoes and slowly back into one.',
+    },
+    { k: 'switch', path: 'visual.haze', label: 'Noise haze' },
+    { k: 'note', text: 'A haze around the bubble that swells once per cycle, with the waves.' },
+    { k: 'group', label: 'Full wheel' },
+    { k: 'seg', path: 'visual.hue', label: 'Tone colors start at', options: [['key', 'The key'], ['fixed', 'A fixed color']], when: (s) => s.visual.color !== 'night' },
+    {
+      k: 'note',
+      text: 'The key sets where the tone colors start, following the circle of fifths, so related keys get neighboring colors. Each bounce path takes its colors from the points it strikes: a triangle gives three, a square four. That part is a convention; the film’s colors are physics.',
+    },
+    { k: 'group', label: 'Calm by design' },
+    {
+      k: 'note',
+      text: 'Nothing on the stage flashes faster than about once a second, and the beats are never drawn, so the picture never flickers at the beat rate. Across the sleep timer the film drains and darkens along with the sound.',
+    },
+    { k: 'group', label: 'Dark screen' },
+    { k: 'switch', path: 'sleep.darkOrbit', label: 'Faint bubble on the dark screen' },
+    { k: 'note', text: 'Drawn very dim on pure black, so almost every pixel stays off.' },
+  ],
   sleep: () => [
     { k: 'title', text: 'Sleep' },
     { k: 'slider', path: 'sleep.timer', label: 'Sleep timer', min: 0, max: 180, step: 5, fmt: (v) => (v ? `${v} min` : 'Off') },
@@ -377,7 +427,6 @@ const PANELS = {
       text: 'Before sleep, play the cue a few times. Each time, look around and think: next time I hear this, I will notice I am dreaming. Keep the phone charging, since the screen stays on (black) until the last cue.',
     },
     { k: 'group', label: 'Screen' },
-    { k: 'switch', path: 'sleep.darkOrbit', label: 'Faint rings on the dark screen' },
     {
       k: 'note',
       text: 'iPhone stops a home-screen web app’s sound when the phone locks, so Lull keeps the screen awake while it plays. Go dark shows pure black, which switches the pixels off. When the session ends, the phone is free to lock again.',
@@ -399,7 +448,7 @@ function renderPanel() {
       sw.style.padding = '0';
       head.append(sw);
       panelEl.append(head);
-      panelEl.append(sliderCtl({ path: `${def.layer}.level`, label: 'Level', min: 0, max: 1, step: 0.01, fmt: pct }));
+      panelEl.append(sliderCtl({ path: `${def.layer}.level`, label: def.levelLabel || 'Level', min: 0, max: 1, step: 0.01, fmt: pct }));
     } else if (def.k === 'title') {
       const head = el('div', 'layer-head');
       head.append(el('h2', 'layer-title', def.text));
@@ -1061,144 +1110,95 @@ darkEl.addEventListener('click', () => {
   showDarkHint();
 });
 function drawDarkOnce() {
-  const g = darkCanvas.getContext('2d');
-  g.clearRect(0, 0, darkCanvas.width, darkCanvas.height);
-  if (state.sleep.darkOrbit) drawOrbit(darkCanvas, 0.22);
+  if (state.sleep.darkOrbit) drawBubble(darkBubble, darkCanvas, 0.45);
+  else {
+    const g = darkCanvas.getContext('2d');
+    g.clearRect(0, 0, darkCanvas.width, darkCanvas.height);
+  }
 }
 
-// ---------------------------------------------------------------- orbit visualizer
+// ---------------------------------------------------------------- the bubble (stage visual)
 
 const orbit = $('#orbit');
-let staticCache = { key: '', pat: null };
-function staticPattern() {
-  const key = JSON.stringify([state.cycle, state.rhythm, state.chord, state.root, state.pulse]);
-  if (key !== staticCache.key) staticCache = { key, pat: pulsePattern(state) };
-  return staticCache.pat;
-}
+const stageBubble = new Bubble();
+const darkBubble = new Bubble();
 
-function sizeCanvas(c) {
-  const dpr = Math.min(3, window.devicePixelRatio || 1);
-  const w = Math.round(c.clientWidth * dpr);
-  const h = Math.round(c.clientHeight * dpr);
-  if (c.width !== w || c.height !== h) {
-    c.width = w;
-    c.height = h;
+// velocity of strike m of pulse voice vi in the engine's actual pattern (0 = dropped by variation)
+let hitPat = null;
+let hitMap = null;
+function hitVel(vi, m) {
+  const pat = engine.pattern;
+  if (!pat || !pat.voices[vi]) return null;
+  if (pat !== hitPat) {
+    hitPat = pat;
+    hitMap = new Map();
+    pat.hits.forEach((h) => hitMap.set(h.v * 1e6 + h.c * 1e3 + h.h, h.vel));
   }
-  return dpr;
+  const n = pat.voices[vi].hits;
+  const c = mod(Math.floor(m / n), pat.K);
+  return hitMap.get(vi * 1e6 + c * 1e3 + mod(m, n)) || 0;
 }
 
-function drawOrbit(c, alpha = 1) {
-  const dpr = sizeCanvas(c);
-  const g = c.getContext('2d');
-  const W = c.width;
-  const H = c.height;
-  g.clearRect(0, 0, W, H);
-  if (!W || !H) return;
-  const playing = engine.playing && engine.ctx && engine.pattern;
-  const st = playing ? engine.state : state;
-  const pat = playing ? engine.pattern : staticPattern();
-  const cx = W / 2;
-  const cy = H / 2;
-  const R = Math.min(W, H) / 2 - 10 * dpr;
-  const T = st.cycle;
-  const el2 = playing ? engine.time - engine.t0 : 0;
-  const A = (x) => Math.max(0, Math.min(1, x * alpha));
-  const TAU = Math.PI * 2;
-
-  // drone partials, breathing in the middle
-  const chord = (CHORDS[st.chord] || CHORDS.overtone).field;
-  const rates = fieldRates(st.rhythm, chord.length);
-  const p = shapePower(st.drone.shape);
-  const amps = droneAmps(st.chord);
-  const dOn = st.drone.on && st.drone.level > 0.01;
-  const rD = R * 0.26;
-  let sum = 0;
-  chord.forEach((ratio, j) => {
-    const f = playing ? Math.pow((1 + Math.cos((TAU * rates[j] * el2) / T)) / 2, p) : 1;
-    const d = droneDepth(st.drone.depth, j);
-    const s = 1 - d + d * f;
-    sum += s;
-    const ang = -Math.PI / 2 + (TAU * j) / chord.length;
-    const rad = (1.6 + 7 * s * Math.sqrt(amps[j] / amps[0])) * dpr;
-    g.beginPath();
-    g.arc(cx + Math.cos(ang) * rD, cy + Math.sin(ang) * rD, rad, 0, TAU);
-    g.fillStyle = `rgba(255,160,102,${A((dOn ? 0.12 + 0.7 * s : 0.1) * (playing ? 1 : 0.45))})`;
-    g.fill();
+// which copies of the voice are speaking now, and how far through their words
+function voiceShells(now) {
+  const vi = engine.voiceInfo;
+  const st = engine.state;
+  if (!vi || !st.voice.on || st.voice.level < 0.01 || now < vi.start) return [];
+  const out = [];
+  vi.lens.forEach((len, k) => {
+    const into = mod(now - vi.start, len);
+    for (const [a, b] of vi.segs) {
+      if (into >= a && into < b) {
+        const u = (into - a) / Math.max(0.05, b - a);
+        out.push({ k, n: vi.lens.length, u, env: Math.sin(Math.PI * u) * Math.min(1.2, st.voice.level / 0.8) });
+        break;
+      }
+    }
   });
-  const mean = sum / chord.length;
-  const grad = g.createRadialGradient(cx, cy, 0, cx, cy, R * 0.45);
-  grad.addColorStop(0, `rgba(232,97,60,${A(dOn && playing ? 0.04 + 0.24 * mean * mean : 0.03)})`);
-  grad.addColorStop(1, 'rgba(232,97,60,0)');
-  g.fillStyle = grad;
-  g.beginPath();
-  g.arc(cx, cy, R * 0.45, 0, TAU);
-  g.fill();
+  return out;
+}
 
-  // pulse rings
-  const nv = pat.voices.length;
-  const pOn = st.pulse.on && st.pulse.level > 0.01;
-  const ringR = (i) => R * (0.5 + (0.5 * (i + 1)) / nv);
-  for (let i = 0; i < nv; i++) {
-    const r = ringR(i);
-    g.beginPath();
-    g.arc(cx, cy, r, 0, TAU);
-    g.strokeStyle = `rgba(122,58,40,${A(pOn ? 0.6 : 0.3)})`;
-    g.lineWidth = dpr;
-    g.stroke();
-    const n = pat.voices[i].hits;
-    for (let h = 0; h < n; h++) {
-      const ang = -Math.PI / 2 + (TAU * h) / n;
-      g.beginPath();
-      g.arc(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r, (h === 0 ? 2.8 : 2) * dpr, 0, TAU);
-      g.fillStyle = `rgba(165,107,88,${A(pOn ? 0.7 : 0.3)})`;
-      g.fill();
-    }
+function drawBubble(bub, canvas, alpha) {
+  const v = state.visual;
+  const playing = engine.playing && engine.ctx;
+  const st = playing ? engine.state : state;
+  const mode = v.color === 'auto' ? (state.sleep.timer > 0 ? 'night' : 'wheel') : v.color;
+  let t = 0.3;
+  let wind = 0;
+  let shells = [];
+  if (playing) {
+    const now = engine.time;
+    t = now - engine.t0;
+    if (engine.timerEnd && st.sleep.winddown) wind = Math.min(1, Math.max(0, (now - engine.sessionStart) / (engine.timerEnd - engine.sessionStart)));
+    shells = voiceShells(now);
   }
-  if (playing && pOn && el2 >= 0) {
-    const tl = mod(el2, pat.length);
-    for (const hit of pat.hits) {
-      const dt = mod(tl - hit.t, pat.length);
-      if (dt > 2.5) continue;
-      const gl = Math.exp(-dt / 0.55) * hit.vel;
-      const vo = pat.voices[hit.v];
-      const r = ringR(hit.v);
-      const ang = -Math.PI / 2 + (TAU * hit.h) / vo.hits;
-      const x = cx + Math.cos(ang) * r;
-      const y = cy + Math.sin(ang) * r;
-      const rr = 15 * dpr;
-      const rg = g.createRadialGradient(x, y, 0, x, y, rr);
-      rg.addColorStop(0, `rgba(255,176,118,${A(0.95 * gl)})`);
-      rg.addColorStop(1, 'rgba(255,176,118,0)');
-      g.fillStyle = rg;
-      g.beginPath();
-      g.arc(x, y, rr, 0, TAU);
-      g.fill();
-    }
-  }
-
-  // the hand: one turn per cycle
-  const ang = -Math.PI / 2 + TAU * mod(el2 / T, 1);
-  g.beginPath();
-  g.moveTo(cx + Math.cos(ang) * R * 0.44, cy + Math.sin(ang) * R * 0.44);
-  g.lineTo(cx + Math.cos(ang) * (R + 5 * dpr), cy + Math.sin(ang) * (R + 5 * dpr));
-  g.strokeStyle = `rgba(232,97,60,${A(playing ? 0.75 : 0.3)})`;
-  g.lineWidth = 1.5 * dpr;
-  g.stroke();
+  bub.draw(canvas, {
+    st,
+    t,
+    mode,
+    hueFrom: v.hue,
+    alpha: v.on ? (alpha * v.level) / 0.7 : 0,
+    wind,
+    layers: { skin: v.skin, balls: v.balls, star: v.star, knot: v.knot, echoes: v.echoes, haze: v.haze },
+    hitVel: playing ? hitVel : null,
+    shells,
+  });
 }
 
 function drawStatic() {
-  drawOrbit(orbit, 1);
+  drawBubble(stageBubble, orbit, 1);
 }
 
 let raf = null;
 let lastFrame = 0;
 function frame(ts) {
   raf = requestAnimationFrame(frame);
-  if (ts - lastFrame < 30) return;
+  // the dark screen is drawn at half the rate to save battery
+  if (ts - lastFrame < (darkEl.hidden ? 32 : 66)) return;
   lastFrame = ts;
   if (!darkEl.hidden) {
-    if (state.sleep.darkOrbit) drawOrbit(darkCanvas, 0.22);
-  } else drawOrbit(orbit, 1);
+    if (state.sleep.darkOrbit) drawBubble(darkBubble, darkCanvas, 0.45);
+  } else drawBubble(stageBubble, orbit, 1);
 }
 function startLoop() {
   if (!raf) raf = requestAnimationFrame(frame);
@@ -1247,7 +1247,10 @@ function applyPreset(s, name) {
   const keepSel = state.voice.selected.slice();
   const keepCue = state.sleep.lucidCue;
   const keepDarkOrbit = state.sleep.darkOrbit;
+  const keepVisual = clone(state.visual);
   state = merge(DEFAULTS, s);
+  // the visual is a viewing preference, so presets only change it if they say so
+  state.visual = s.visual ? merge(keepVisual, s.visual) : keepVisual;
   const sel = (s.voice && s.voice.selected ? s.voice.selected : keepSel).filter((id) => mantras.has(id));
   state.voice.selected = sel.length || !(s.voice && s.voice.selected) ? sel : keepSel.filter((id) => mantras.has(id));
   if (!(s.sleep && s.sleep.lucidCue && mantras.has(s.sleep.lucidCue))) state.sleep.lucidCue = mantras.has(keepCue) ? keepCue : 'chime';

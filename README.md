@@ -1,6 +1,6 @@
 # Lull
 
-A personal, offline sleep and mantra instrument for iPhone: your recorded voice looping and phasing, a just-intonation drone that swells in polyrhythm, tuned pulse rings, optional beats and noise, a sleep timer with wind-down, and lucid-dream cues.
+A personal, offline sleep and mantra instrument for iPhone: your recorded voice looping and phasing, a just-intonation drone that swells in polyrhythm, tuned pulse rings, optional beats and noise, a sleep timer with wind-down, and lucid-dream cues. A 3D bubble on screen moves with the sound: tones bounce inside it tracing star shapes, the drone forms a knot of light at its center, and the skin shimmers with real soap-film colors (amber-only at night).
 
 It is a plain web app (no build step) meant to be added to the iPhone home screen. Everything runs on the phone; recordings never leave it.
 
@@ -12,9 +12,14 @@ It is a plain web app (no build step) meant to be added to the iPhone home scree
 ## Updating
 Edit the files, bump `VERSION` in `sw.js`, redeploy. On the phone, open the app twice to pick up the new version.
 
+## Versions
+- `main`: v2, with the bubble visual and Visual tab.
+- `v1-original` branch: the original app with the flat orbit visualizer.
+
 ## Files
 - `engine.js`: Web Audio engine (all rhythm runs on the audio clock).
-- `app.js`: interface, settings, recorder, presets, visualizer.
+- `app.js`: interface, settings, recorder, presets.
+- `bubble.js`: the bubble visual (v2).
 - `store.js`: recordings in IndexedDB.
 - `sw.js`: offline cache.
 - `fonts/`: Spectral (from `@fontsource/spectral`, SIL Open Font License).

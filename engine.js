@@ -885,12 +885,14 @@ export class Engine {
     list.forEach((m) => (len += m.pcm.length + gapS));
     const total = len + extraMax;
     const pcm = new Float32Array(Math.max(total, 1));
+    const segs = [];
     let o = 0;
     list.forEach((m) => {
       pcm.set(m.pcm, o);
+      segs.push([o, o + m.pcm.length]);
       o += m.pcm.length + gapS;
     });
-    return { pcm, base: len, rate };
+    return { pcm, base: len, rate, segs };
   }
 
   _voiceCopies(delay, fade) {
@@ -900,6 +902,7 @@ export class Engine {
     const old = v.copies;
     if (old) fadeOutAndStop(ctx, old.bus, old.srcs, fade || 0.3);
     v.copies = null;
+    this.voiceInfo = null;
     const ph = this._phrase();
     if (!ph) return;
     const buf = ctx.createBuffer(1, ph.pcm.length, SR_STORE);
@@ -931,6 +934,14 @@ export class Engine {
     bus.gain.setValueAtTime(0, ts);
     bus.gain.linearRampToValueAtTime(1, ts + 0.08);
     v.copies = { bus, srcs };
+    // loop timing for the visual, in real seconds: when the copies start, each copy's loop
+    // length, and where the words fall within a loop
+    const sec = SR_STORE * ph.rate;
+    this.voiceInfo = {
+      start: ts,
+      lens: srcs.map((_, k) => (ph.base + Math.round(k * st.drift * ph.rate * SR_STORE)) / sec),
+      segs: ph.segs.map(([a, b]) => [a / sec, b / sec]),
+    };
   }
 
   // ---------- levels & session ----------

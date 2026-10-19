@@ -1,11 +1,12 @@
 // Offline cache: everything Lull needs is stored on first visit.
-const VERSION = 'lull-v1';
+const VERSION = 'lull-v2';
 const ASSETS = [
   './',
   'index.html',
   'styles.css',
   'app.js',
   'engine.js',
+  'bubble.js',
   'store.js',
   'manifest.webmanifest',
   'icons/icon-180.png',
